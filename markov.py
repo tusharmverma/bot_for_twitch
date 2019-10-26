@@ -13,7 +13,24 @@ class Transition(object):
 
 
 class MarkovModel(object):
-    
+
+def get_data(cursor):
+    attributes = ['slug', 'synopsis']
+    results = []
+    for i, x in enumerate(cursor):
+        results.append([x[k] for k in attributes])
+
+    df = pd.DataFrame(results, columns=attributes)
+    return df
+
+def test_anime_synopsis(n_synopsis, order):
+    client = MongoClient()
+    db = client.kitsu
+    cursor = db.anime.find()
+    df = get_data(cursor)
+    words = ' '.join([s for s in df.synopsis.values[-n_synopsis:]]).split()
+    mm = MarkovModel(words, order=order)
+    return mm
 
 
 
