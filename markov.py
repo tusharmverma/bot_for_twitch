@@ -10,9 +10,72 @@ from pymongo import MongoClient
 
 class Transition(object):
     """"""
+    def __init__(self, key, value):
+        super(Transition, self).__init__()
+        self.key = key
+        self.count = 1
+        self.transitions = {value: 1}
+
+    def update(self, value):
+        self.count += 1
+        if value not in self.transitions:
+            self.transitions[value] = 1
+        else:
+            self.transitions[value] += 1
+
+    @property
+    def predict_next(self):
+        a = list(self.transitions.keys())
+        p = np.array(list(self.transitions.values())) / float(self.count)
+        return np.random.choice(a=a, size=1, p=p)[0]
 
 
 class MarkovModel(object):
+    def __init__(self, words, order=3, use_pos=False):
+        self.cache = {}
+        self.words = words
+        self.n_words = len(self.words)
+        self.order = order
+        self.use_pos = use_pos
+        self._initialise_cache()
+
+    def _ngrams(self):
+        if len(self.words) < self.order:
+            return
+
+        for i in range(self.n_words - (self.order - 1)):
+            words = self.words[i:i + self.order]
+            yield tuple(words)
+
+    def _initialise_cache(self):
+        for words in self._ngrams():
+            key, value = tuple(words[:-1]), words[-1]
+            if key not in self.cache:
+                self.cache[key] = Transition(key, value)
+            else:
+                self.cache[key].update(value)
+
+    def _seed_key(self):
+        i = np.random.randint(0, self.n_words - self.order)
+        words = self.words[i:i + (self.order - 1)]
+        return tuple(words)
+
+    def _generate(self, size):
+        key = self._seed_key()
+        words = list(key)
+        for _ in range(size - 1):
+            v = self.cache[key].predict_next
+            words.append(v)
+            key = tuple(list(key)[1:] + [v])
+        return words
+
+    def _text_post_processing(self, words):
+        return ' '.join(words)
+
+    def generate_text(self, size):
+        words = self._generate(size)
+        return self._text_post_processing(words)
+
 
 def get_data(cursor):
     attributes = ['slug', 'synopsis']
